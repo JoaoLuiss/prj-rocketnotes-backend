@@ -1,11 +1,11 @@
 require('express-async-errors');
-const migrationsRun = require('./database/sqlite/migrations');
 const express = require('express');
+const { knexMigrationsRun } = require('./database/knex');
 
 const AppError = require('./utils/AppError');
 const routes = require('./routes');
 
-migrationsRun();
+knexMigrationsRun();
 
 const app = express();
 app.use(express.json());
