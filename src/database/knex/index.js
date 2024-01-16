@@ -12,4 +12,5 @@ async function knexMigrationsRun() {
   }
 }
 
-module.exports = { knexConnection, knexMigrationsRun };
+module.exports = knexConnection;
+module.exports.knexMigrationsRun = knexMigrationsRun;
