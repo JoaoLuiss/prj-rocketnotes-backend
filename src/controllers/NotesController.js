@@ -84,17 +84,20 @@ class NotesController {
     // search the notes by the tag (if tags were passed on request)
     let notes;
     if (tags) {
+      // if there's tag, search by it
       const tagsArray = tags.split(',').map((tag) => tag.trim());
 
       notes = await knex('notes')
         .innerJoin('tags', 'tags.note_id', 'notes.id')
-        .select(['notes.id', 'notes.title', 'notes.user_id'])
+        // .select('notes.id', 'notes.title', 'notes.user_id')
+        .select('notes.*')
         .where('notes.user_id', user_id)
         .whereLike('notes.title', `%${title}%`)
         .whereIn('tags.name', tagsArray)
         .orderBy('notes.title')
         .groupBy('notes.id');
-    } /* if no tags, search by title */ else {
+    } else {
+      /* if no tags, search by title of the note */
       notes = await knex('notes')
         .where({ user_id })
         .whereLike('title', `%${title}%`)
