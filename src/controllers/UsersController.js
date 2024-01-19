@@ -1,19 +1,15 @@
 const AppError = require('../utils/AppError');
 const sqliteConnection = require('../database/sqlite');
+const knex = require('../database/knex');
 const { hash, compare } = require('bcryptjs');
 
 class UsersController {
   async create(request, response) {
     const { name, email, password } = request.body;
 
-    const database = await sqliteConnection();
-
-    // verify if user email already exists
-    const emailExists = await database.get(
-      'SELECT * FROM users WHERE email = (?)',
-      [email]
-    );
-    if (emailExists) {
+    // verify if user email is already in use
+    const emailInUse = await knex('users').where({ email });
+    if (emailInUse) {
       throw new AppError('Este email já está em uso');
     }
 
@@ -21,10 +17,7 @@ class UsersController {
     const hashedPassword = await hash(password, 8);
 
     // save new user into data base
-    await database.run(
-      'INSERT INTO users ( name, email, password) VALUES (?, ?, ?)',
-      [name, email, hashedPassword]
-    );
+    await knex('users').insert({ name, email, password });
 
     if (!name) {
       throw new AppError('O nome é obrigatório!');
@@ -36,26 +29,25 @@ class UsersController {
   async update(request, response) {
     const { name, email, password, new_password } = request.body;
     const { id } = request.params;
-    const database = await sqliteConnection();
 
     // verify the user with that id
-    const user = await database.get('SELECT * FROM users WHERE id = (?)', [id]);
+    const user = await knex('users').select('*').where({ id }).first();
     if (!user) {
       throw new AppError('Usuário não encontrato');
     }
 
-    // verify if new email is already being used
-    const userAlreadyaHaveTheEmail = await database.get(
-      'SELECT * FROM users WHERE email = (?)',
-      [email]
-    );
-    if (userAlreadyaHaveTheEmail && userAlreadyaHaveTheEmail.id !== user.id) {
+    // verify if the new email is already in used by other user
+    const userAlreadyHaveNewEmail = await knex('users')
+      .select('*')
+      .where({ email })
+      .first();
+    if (userAlreadyHaveNewEmail && userAlreadyHaveNewEmail.id !== user.id) {
       throw new AppError(
         'Este email já está sendo usado por outro usuário (que não é você).'
       );
     }
 
-    // verify if password is valid and update
+    // verify if password is valid, and update it
     if (new_password && !password) {
       throw new AppError('Você precisa informar a senha antiga.');
     }
@@ -68,18 +60,22 @@ class UsersController {
       user.password = await hash(new_password, 8);
     }
 
-    // have come this far, then just update user in data base
+    // have come this far, then just update user in database
     user.name = name ?? user.name;
     user.email = email ?? user.email;
-    await database.run(
-      `UPDATE users SET
-      name = ?,
-      email = ?,
-      password = ?,
-      updated_at = DATETIME('now')
-      WHERE id = ?`,
-      [user.name, user.email, user.password, id]
-    );
+    user.updated_at = knex.fn.now();
+    await knex('users').where({ id }).update(user);
+    // await database.run(
+    //   `UPDATE users SET
+    //   name = ?,
+    //   email = ?,
+    //   password = ?,
+    //   updated_at = DATETIME('now')
+    //   WHERE id = ?`,
+    //   [user.name, user.email, user.password, id]
+    // );
+    //
+    // knex.fn.now()
 
     return response.status(200).json();
   }
